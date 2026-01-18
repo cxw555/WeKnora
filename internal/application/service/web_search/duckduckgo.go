@@ -27,7 +27,7 @@ type DuckDuckGoProvider struct {
 func NewDuckDuckGoProvider(_ config.WebSearchProviderConfig) (interfaces.WebSearchProvider, error) {
 	return &DuckDuckGoProvider{
 		client: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout: 5 * time.Second, // Reduced from 30s to 5s to minimize wait time for failed requests
 		},
 	}, nil
 }
