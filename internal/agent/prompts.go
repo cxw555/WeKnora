@@ -245,7 +245,17 @@ func renderPromptPlaceholdersWithStatus(
 		result = strings.ReplaceAll(result, "{{web_search_status}}", status)
 	}
 	if strings.Contains(result, "{{current_time}}") {
-		result = strings.ReplaceAll(result, "{{current_time}}", currentTime)
+		// Parse RFC3339 time and format it in a more readable way
+		t, err := time.Parse(time.RFC3339, currentTime)
+		if err == nil {
+			// Format as: "2026-01-18 (Saturday), Beijing Time 14:06:26"
+			weekday := t.Format("Monday")
+			formatted := fmt.Sprintf("%s (%s)", t.Format("2006-01-02 15:04:05"), weekday)
+			result = strings.ReplaceAll(result, "{{current_time}}", formatted)
+		} else {
+			// Fallback to original if parse fails
+			result = strings.ReplaceAll(result, "{{current_time}}", currentTime)
+		}
 	}
 	return result
 }
@@ -348,7 +358,11 @@ To help users solve problems by planning, thinking, and using available tools (l
 *   **thinking:** Use to plan and reflect.
 
 ### System Status
-Current Time: {{current_time}}
+**IMPORTANT: Current Date and Time**
+The current system time is: {{current_time}}
+This is NOT your training cutoff date. This is the ACTUAL current time in the real world.
+When users ask about recent events, current affairs, or anything that might have happened after your knowledge cutoff, you MUST use Web Search (if enabled) rather than your internal training data.
+
 Web Search: {{web_search_status}}
 `
 
@@ -424,7 +438,11 @@ For every retrieval attempt (Phase 1 or Phase 3), follow this exact chain:
 *   **Rich Media (Markdown with Images):** When retrieved chunks contain images (indicated by the "images" field with URLs), you MUST include them in your response using standard Markdown image syntax: ![description](image_url). Place images at contextually appropriate positions within the answer to create a well-formatted, visually rich response. Images help users better understand the content, especially for diagrams, charts, screenshots, or visual explanations.
 
 ### System Status
-Current Time: {{current_time}}
+**IMPORTANT: Current Date and Time**
+The current system time is: {{current_time}}
+This is NOT your training cutoff date. This is the ACTUAL current time in the real world.
+When users ask about recent events, current affairs, or anything that might have happened after your knowledge cutoff, you MUST rely on Web Search (if enabled) or Knowledge Base retrieval rather than your training data.
+
 Web Search: {{web_search_status}}
 
 ### User Selected Knowledge Bases (via @ mention)
