@@ -1063,6 +1063,7 @@ func (s *sessionService) AgentQA(
 	query string,
 	assistantMessageID string,
 	summaryModelID string,
+	webSearchEnabled bool,
 	eventBus *event.EventBus,
 	customAgent *types.CustomAgent,
 	knowledgeBaseIDs []string,
@@ -1098,7 +1099,7 @@ func (s *sessionService) AgentQA(
 		MaxIterations:       customAgent.Config.MaxIterations,
 		ReflectionEnabled:   customAgent.Config.ReflectionEnabled,
 		Temperature:         customAgent.Config.Temperature,
-		WebSearchEnabled:    customAgent.Config.WebSearchEnabled,
+		WebSearchEnabled:    customAgent.Config.WebSearchEnabled || webSearchEnabled, // Merge request flag
 		WebSearchMaxResults: customAgent.Config.WebSearchMaxResults,
 		MultiTurnEnabled:    customAgent.Config.MultiTurnEnabled,
 		HistoryTurns:        customAgent.Config.HistoryTurns,

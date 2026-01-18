@@ -22,6 +22,7 @@ import (
 	"github.com/qdrant/go-client/qdrant"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/dig"
+	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
@@ -269,6 +270,34 @@ func initDatabase(cfg *config.Config) (*gorm.DB, error) {
 	var dialector gorm.Dialector
 	var migrateDSN string
 	switch os.Getenv("DB_DRIVER") {
+	case "mysql":
+		// DSN for GORM
+		gormDSN := fmt.Sprintf(
+			"%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+			os.Getenv("DB_USER"),
+			os.Getenv("DB_PASSWORD"),
+			os.Getenv("DB_HOST"),
+			os.Getenv("DB_PORT"),
+			os.Getenv("DB_NAME"),
+		)
+		dialector = mysql.Open(gormDSN)
+
+		// DSN for golang-migrate
+		migrateDSN = fmt.Sprintf(
+			"mysql://%s:%s@tcp(%s:%s)/%s",
+			os.Getenv("DB_USER"),
+			url.QueryEscape(os.Getenv("DB_PASSWORD")),
+			os.Getenv("DB_HOST"),
+			os.Getenv("DB_PORT"),
+			os.Getenv("DB_NAME"),
+		)
+
+		logger.Infof(context.Background(), "DB Config (MySQL): user=%s host=%s port=%s dbname=%s",
+			os.Getenv("DB_USER"),
+			os.Getenv("DB_HOST"),
+			os.Getenv("DB_PORT"),
+			os.Getenv("DB_NAME"),
+		)
 	case "postgres":
 		// DSN for GORM (key-value format)
 		gormDSN := fmt.Sprintf(

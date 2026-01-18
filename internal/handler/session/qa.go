@@ -444,6 +444,7 @@ func (h *Handler) executeAgentModeQA(reqCtx *qaRequestContext) {
 			reqCtx.query,
 			reqCtx.assistantMessage.ID,
 			reqCtx.summaryModelID,
+			reqCtx.webSearchEnabled,
 			streamCtx.eventBus,
 			reqCtx.customAgent,
 			reqCtx.knowledgeBaseIDs,

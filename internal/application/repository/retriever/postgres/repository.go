@@ -193,22 +193,38 @@ func (g *pgRepository) KeywordsRetrieve(ctx context.Context,
 			Values: common.ToInterfaceSlice(params.TagIDs),
 		})
 	}
-	conds = append(conds, clause.Expr{
-		SQL:  "id @@@ paradedb.match(field => 'content', value => ?, distance => 1)",
-		Vars: []interface{}{params.Query},
-	})
+
+	// Check if we are actually using Postgres with ParadeDB
+	if g.db.Dialector.Name() == "postgres" {
+		conds = append(conds, clause.Expr{
+			SQL:  "id @@@ paradedb.match(field => 'content', value => ?, distance => 1)",
+			Vars: []interface{}{params.Query},
+		})
+	} else {
+		// Fallback for non-postgres databases (e.g. MySQL)
+		conds = append(conds, clause.Expr{
+			SQL:  "content LIKE ?",
+			Vars: []interface{}{"%" + params.Query + "%"},
+		})
+	}
+
 	// Filter by is_enabled = true or NULL (NULL means enabled for historical data)
 	conds = append(conds, clause.Expr{
 		SQL:  "(is_enabled IS NULL OR is_enabled = ?)",
 		Vars: []interface{}{true},
 	})
-	conds = append(conds, clause.OrderBy{Columns: []clause.OrderByColumn{
-		{Column: clause.Column{Name: "score"}, Desc: true},
-	}})
+
+	if g.db.Dialector.Name() == "postgres" {
+		conds = append(conds, clause.OrderBy{Columns: []clause.OrderByColumn{
+			{Column: clause.Column{Name: "score"}, Desc: true},
+		}})
+	}
 
 	var embeddingDBList []pgVectorWithScore
-	err := g.db.WithContext(ctx).Clauses(conds...).Debug().
-		Select([]string{
+	db := g.db.WithContext(ctx).Clauses(conds...).Debug()
+
+	if g.db.Dialector.Name() == "postgres" {
+		db = db.Select([]string{
 			"paradedb.score(id) as score",
 			"id",
 			"content",
@@ -218,9 +234,22 @@ func (g *pgRepository) KeywordsRetrieve(ctx context.Context,
 			"knowledge_id",
 			"knowledge_base_id",
 			"tag_id",
-		}).
-		Limit(int(params.TopK)).
-		Find(&embeddingDBList).Error
+		})
+	} else {
+		db = db.Select([]string{
+			"1.0 as score", // Dummy score for non-postgres
+			"id",
+			"content",
+			"source_id",
+			"source_type",
+			"chunk_id",
+			"knowledge_id",
+			"knowledge_base_id",
+			"tag_id",
+		})
+	}
+
+	err := db.Limit(int(params.TopK)).Find(&embeddingDBList).Error
 
 	if err == gorm.ErrRecordNotFound {
 		logger.GetLogger(ctx).Warnf("[Postgres] No records found for keywords query: %s", params.Query)
@@ -335,6 +364,19 @@ func (g *pgRepository) VectorRetrieve(ctx context.Context,
 	}
 	if expandedTopK > 1000 {
 		expandedTopK = 1000 // Maximum 1000 candidates
+	}
+
+	// Check if we are actually using Postgres
+	if g.db.Dialector.Name() != "postgres" {
+		logger.GetLogger(ctx).Warnf("[Postgres] Vector retrieval called on non-postgres database (%s), returning empty results", g.db.Dialector.Name())
+		return []*types.RetrieveResult{
+			{
+				Results:             []*types.IndexWithScore{},
+				RetrieverEngineType: types.PostgresRetrieverEngineType,
+				RetrieverType:       types.VectorRetrieverType,
+				Error:               nil,
+			},
+		}, nil
 	}
 
 	// Optimized query: Use subquery to calculate distance once
@@ -494,7 +536,7 @@ func (g *pgRepository) CopyIndices(ctx context.Context,
 			// Create new vector index, copy the content and vector of the source index
 			targetVector := &pgVector{
 				Content:         sourceVector.Content,
-				SourceID:        targetSourceID,        // Handle SourceID transformation properly
+				SourceID:        targetSourceID, // Handle SourceID transformation properly
 				SourceType:      sourceVector.SourceType,
 				ChunkID:         targetChunkID,         // Update to target chunk ID
 				KnowledgeID:     targetKnowledgeID,     // Update to target knowledge ID

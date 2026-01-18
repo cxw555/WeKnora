@@ -95,6 +95,10 @@ func (p *DuckDuckGoProvider) searchHTML(
 
 	resp, err := p.client.Do(req)
 	if err != nil {
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "connection reset") || strings.Contains(errMsg, "timeout") {
+			logger.Warnf(ctx, "DuckDuckGo connection issue: %v. Please check your network or HTTPS_PROXY settings.", err)
+		}
 		return nil, fmt.Errorf("failed to perform request: %w", err)
 	}
 	defer resp.Body.Close()
@@ -110,17 +114,22 @@ func (p *DuckDuckGoProvider) searchHTML(
 
 	results := make([]*types.WebSearchResult, 0, maxResults)
 	// Structure based on DDG HTML page
-	doc.Find(".web-result").Each(func(i int, s *goquery.Selection) {
+	// Common selectors for DDG HTML:
+	// - .web-result (standard)
+	// - .result (sometimes used)
+	doc.Find(".web-result, .result").Each(func(i int, s *goquery.Selection) {
 		if len(results) >= maxResults {
 			return
 		}
-		titleNode := s.Find(".result__a")
+		// Title and Link
+		titleNode := s.Find(".result__a, .result__title a")
 		title := strings.TrimSpace(titleNode.Text())
 		var link string
 		if href, exists := titleNode.Attr("href"); exists {
 			link = cleanDDGURL(href)
 		}
-		snippet := strings.TrimSpace(s.Find(".result__snippet").Text())
+		// Snippet
+		snippet := strings.TrimSpace(s.Find(".result__snippet, .result__body").Text())
 		if title != "" && link != "" {
 			results = append(results, &types.WebSearchResult{
 				Title:   title,
@@ -153,7 +162,7 @@ func (p *DuckDuckGoProvider) searchAPI(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	req.Header.Set("User-Agent", "WeKnora/1.0")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 
 	resp, err := p.client.Do(req)
 	if err != nil {

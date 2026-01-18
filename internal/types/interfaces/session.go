@@ -50,12 +50,14 @@ type SessionService interface {
 	// eventBus is optional - if nil, uses service's default EventBus
 	// customAgent is optional - if provided, uses custom agent configuration instead of tenant defaults
 	// summaryModelID is optional - if provided, overrides the model from customAgent config
+	// webSearchEnabled: whether to enable web search (overrides agent config if true)
 	AgentQA(
 		ctx context.Context,
 		session *types.Session,
 		query string,
 		assistantMessageID string,
 		summaryModelID string,
+		webSearchEnabled bool,
 		eventBus *event.EventBus,
 		customAgent *types.CustomAgent,
 		knowledgeBaseIDs []string,
